@@ -1,5 +1,6 @@
 import socket
 import threading
+from math import ceil
 
 PORT = 5050
 HOST = socket.gethostbyname(socket.gethostname())
@@ -15,7 +16,6 @@ def handle_client_go_back_n(connection, address):
     window_size = int(connection.recv(1).decode(FORMAT))
 
     result = []
-
     buffer = []
     connected = True
     while connected:
@@ -30,15 +30,10 @@ def handle_client_go_back_n(connection, address):
         if message_type == FRAME_MESSAGE:
             buffer.append(message_data)
             if len(buffer) == window_size:
-                result.extend(buffer)
-                buffer.clear()
-                print(f'Received {"".join(result)}')
-                # TODO: Send RR
+                transfer_from_buffer_to_memory(connection, window_size, buffer, result)
         elif message_type == DISCONNECT_MESSAGE:
             if len(buffer) != 0:
-                result.extend(buffer)
-                buffer.clear()
-                print(f'Received {"".join(result)}')
+                transfer_from_buffer_to_memory(connection, window_size, buffer, result)
             connected = False
             connection.close()
             print(f'Disconnected from {address}')
@@ -47,6 +42,13 @@ def handle_client_go_back_n(connection, address):
             print(f'Unknown message type: {message_type}')
             # TODO: return REJ
             pass
+
+
+def transfer_from_buffer_to_memory(connection, window_size, buffer, memory):
+    memory.extend(buffer)
+    buffer.clear()
+    print(f'Received {"".join(memory)}')
+    connection.send(f'RR{ceil(len(memory) / window_size)}'.encode(FORMAT))
 
 
 def start(host):
