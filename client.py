@@ -5,38 +5,54 @@ from server import ADDRESS, FORMAT, FRAME_MESSAGE, DISCONNECT_MESSAGE, RESPONSE_
 
 
 def send(connection, batch_size, message):
+    windows_timed_out = set()
+    connection.settimeout(0.5)
     for index, frame_set in enumerate(partition(message, batch_size)):
         print(frame_set)
 
         is_last_frame = index == ceil(len(message) / batch_size) - 1
-        if index == 2:
-            response = send_frame_set_with_error(connection, frame_set, batch_size, is_last_frame)
+
+        try:
+            if index == 2:
+                response = send_frame_set_with_error(connection, index, frame_set, batch_size, is_last_frame)
+            else:
+                response = send_frame_set(connection, index, frame_set, is_last_frame)
+        except socket.timeout:
+            response = 'timeout'
+            print(response)
+            windows_timed_out.add(index)
+
+        while RESPONSE_REJECTED in response:
+            print(f'{response}')
+            response = send_frame_set(connection, index, frame_set, is_last_frame)
+
+        if response != 'timeout':
+            if int(response[2:]) in windows_timed_out:
+                windows_timed_out.remove(int(response[2:]))
+                continue
         else:
-            response = send_frame_set(connection, frame_set, is_last_frame)
-
-        while response == RESPONSE_REJECTED:
-            print(f'{response}{index+1}')
-            response = send_frame_set(connection, frame_set, is_last_frame)
-
+            response = send_frame_set(connection, index, frame_set, is_last_frame)
         print(f'{response}')
 
 
-def send_frame_set(connection, frame_set, is_last_frame_set=False):
+def send_frame_set(connection, window_index, frame_set, is_last_frame_set=False):
     for character in frame_set:
-        connection.send(f'{FRAME_MESSAGE}{character}'.encode(FORMAT))
+        connection.send(f'{FRAME_MESSAGE}{window_index}{character}'.encode(FORMAT))
 
     if is_last_frame_set:
-        connection.send(f'{DISCONNECT_MESSAGE} '.encode(FORMAT))
+        connection.send(f'{DISCONNECT_MESSAGE}{window_index} '.encode(FORMAT))
 
     return connection.recv(64).decode(FORMAT)
 
 
-def send_frame_set_with_error(connection, frame_set, batch_size, is_last_frame_set=False):
+def send_frame_set_with_error(connection, window_index, frame_set, batch_size, is_last_frame_set=False):
     for index, character in enumerate(frame_set):
-        connection.send(f'{FRAME_MESSAGE if index != max(batch_size - 2, 0) else "L"}{character}'.encode(FORMAT))
+        connection.send(
+            f'{FRAME_MESSAGE if index != max(batch_size - 2, 0) else "L"}{window_index}{character}'.encode(FORMAT)
+        )
 
     if is_last_frame_set:
-        connection.send(f'{DISCONNECT_MESSAGE} '.encode(FORMAT))
+        connection.send(f'{DISCONNECT_MESSAGE}{window_index} '.encode(FORMAT))
 
     return connection.recv(64).decode(FORMAT)
 

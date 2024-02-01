@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 from math import ceil
 
 PORT = 5050
@@ -19,34 +20,43 @@ def handle_client_go_back_n(connection, address):
 
     result = []
     buffer = []
+    windows_received = set()
     connected = True
     rejected = False
     while connected:
-        message = connection.recv(2).decode(FORMAT)
+        message = connection.recv(3).decode(FORMAT)
 
         if not message:
             continue
 
         message_type = message[0]
-        message_data = message[1]
+        window_index = int(message[1])
+        message_data = message[2]
+
+        if window_index in windows_received:
+            continue
 
         if message_type == FRAME_MESSAGE:
             buffer.append(message_data)
             if len(buffer) == window_size:
+                if window_index == 4:
+                    time.sleep(1)
                 if rejected:
                     rejected = False
                     buffer.clear()
-                    connection.send(f'{RESPONSE_REJECTED}'.encode(FORMAT))
+                    connection.send(f'{RESPONSE_REJECTED}{window_index}'.encode(FORMAT))
                 else:
-                    transfer_from_buffer_to_memory(connection, window_size, buffer, result)
+                    windows_received.add(window_index)
+                    transfer_from_buffer_to_memory(connection, window_index, buffer, result)
         elif message_type == DISCONNECT_MESSAGE:
             if len(buffer) != 0:
                 if rejected:
                     rejected = False
                     buffer.clear()
-                    connection.send(f'{RESPONSE_REJECTED}'.encode(FORMAT))
+                    connection.send(f'{RESPONSE_REJECTED}{window_index}'.encode(FORMAT))
                 else:
-                    transfer_from_buffer_to_memory(connection, window_size, buffer, result)
+                    windows_received.add(window_index)
+                    transfer_from_buffer_to_memory(connection, window_index, buffer, result)
             connected = False
             connection.close()
             print(f'Disconnected from {address}')
@@ -59,11 +69,11 @@ def handle_client_go_back_n(connection, address):
                 buffer.clear()
 
 
-def transfer_from_buffer_to_memory(connection, window_size, buffer, memory):
+def transfer_from_buffer_to_memory(connection, window_index, buffer, memory):
     memory.extend(buffer)
     buffer.clear()
     print(f'Received {"".join(memory)}')
-    connection.send(f'{RESPONSE_READY_TO_RECEIVE}{ceil(len(memory) / window_size)}'.encode(FORMAT))
+    connection.send(f'{RESPONSE_READY_TO_RECEIVE}{window_index}'.encode(FORMAT))
 
 
 def start(host):
