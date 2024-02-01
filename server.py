@@ -8,6 +8,8 @@ ADDRESS = (HOST, PORT)
 FORMAT = 'utf-8'
 FRAME_MESSAGE = 'F'
 DISCONNECT_MESSAGE = 'D'
+RESPONSE_READY_TO_RECEIVE = 'RR'
+RESPONSE_REJECTED = 'REJ'
 
 
 def handle_client_go_back_n(connection, address):
@@ -18,6 +20,7 @@ def handle_client_go_back_n(connection, address):
     result = []
     buffer = []
     connected = True
+    rejected = False
     while connected:
         message = connection.recv(2).decode(FORMAT)
 
@@ -30,25 +33,37 @@ def handle_client_go_back_n(connection, address):
         if message_type == FRAME_MESSAGE:
             buffer.append(message_data)
             if len(buffer) == window_size:
-                transfer_from_buffer_to_memory(connection, window_size, buffer, result)
+                if rejected:
+                    rejected = False
+                    buffer.clear()
+                    connection.send(f'{RESPONSE_REJECTED}'.encode(FORMAT))
+                else:
+                    transfer_from_buffer_to_memory(connection, window_size, buffer, result)
         elif message_type == DISCONNECT_MESSAGE:
             if len(buffer) != 0:
-                transfer_from_buffer_to_memory(connection, window_size, buffer, result)
+                if rejected:
+                    rejected = False
+                    buffer.clear()
+                    connection.send(f'{RESPONSE_REJECTED}'.encode(FORMAT))
+                else:
+                    transfer_from_buffer_to_memory(connection, window_size, buffer, result)
             connected = False
             connection.close()
             print(f'Disconnected from {address}')
             break
         else:
             print(f'Unknown message type: {message_type}')
-            # TODO: return REJ
-            pass
+            rejected = True
+            buffer.append(message_data)
+            if len(buffer) == window_size:
+                buffer.clear()
 
 
 def transfer_from_buffer_to_memory(connection, window_size, buffer, memory):
     memory.extend(buffer)
     buffer.clear()
     print(f'Received {"".join(memory)}')
-    connection.send(f'RR{ceil(len(memory) / window_size)}'.encode(FORMAT))
+    connection.send(f'{RESPONSE_READY_TO_RECEIVE}{ceil(len(memory) / window_size)}'.encode(FORMAT))
 
 
 def start(host):
