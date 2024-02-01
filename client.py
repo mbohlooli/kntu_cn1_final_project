@@ -31,6 +31,7 @@ def send(connection, batch_size, message):
                 windows_timed_out.remove(int(response[2:]))
                 continue
         else:
+            print(f'resending frames {index*window_size}:{(index+1)*window_size}')
             response = send_frame_set(connection, index, frame_set, is_last_frame)
         print(f'{response}')
 
