@@ -1,7 +1,6 @@
 import socket
 import threading
 import time
-from math import ceil
 
 PORT = 5050
 HOST = socket.gethostbyname(socket.gethostname())
@@ -11,9 +10,11 @@ FRAME_MESSAGE = 'F'
 DISCONNECT_MESSAGE = 'D'
 RESPONSE_READY_TO_RECEIVE = 'RR'
 RESPONSE_REJECTED = 'REJ'
+GO_BACK_N = 'GO_BACK_N'
+SELECTIVE_REJECT = 'SELECTIVE_REJECT'
 
 
-def handle_client_go_back_n(connection, address):
+def handle_client(connection, address, protocol):
     print('Connected by', address)
 
     window_size = int(connection.recv(1).decode(FORMAT))
@@ -23,6 +24,7 @@ def handle_client_go_back_n(connection, address):
     windows_received = set()
     connected = True
     rejected = False
+    rejected_index = -1
     while connected:
         message = connection.recv(3).decode(FORMAT)
 
@@ -33,40 +35,78 @@ def handle_client_go_back_n(connection, address):
         window_index = int(message[1])
         message_data = message[2]
 
-        if window_index in windows_received:
-            continue
+        if protocol == GO_BACK_N:
+            if window_index in windows_received:
+                continue
 
-        if message_type == FRAME_MESSAGE:
-            buffer.append(message_data)
-            if len(buffer) == window_size:
-                if window_index == 4:
-                    time.sleep(1)
-                if rejected:
-                    rejected = False
+            if message_type == FRAME_MESSAGE:
+                buffer.append(message_data)
+                if len(buffer) == window_size:
+                    if window_index == 4:
+                        time.sleep(1)
+                    if rejected:
+                        rejected = False
+                        buffer.clear()
+                        connection.send(f'{RESPONSE_REJECTED}{window_index}'.encode(FORMAT))
+                    else:
+                        windows_received.add(window_index)
+                        transfer_from_buffer_to_memory(connection, window_index, buffer, result)
+            elif message_type == DISCONNECT_MESSAGE:
+                if len(buffer) != 0:
+                    if rejected:
+                        rejected = False
+                        buffer.clear()
+                        connection.send(f'{RESPONSE_REJECTED}{window_index}'.encode(FORMAT))
+                    else:
+                        windows_received.add(window_index)
+                        transfer_from_buffer_to_memory(connection, window_index, buffer, result)
+                connected = False
+                connection.close()
+                print(f'Disconnected from {address}')
+                break
+            else:
+                print(f'Unknown message type: {message_type}')
+                rejected = True
+                buffer.append(message_data)
+                if len(buffer) == window_size:
                     buffer.clear()
-                    connection.send(f'{RESPONSE_REJECTED}{window_index}'.encode(FORMAT))
+        elif protocol == SELECTIVE_REJECT:
+            if window_index in windows_received and rejected_index == -1:
+                continue
+
+            if message_type == FRAME_MESSAGE:
+                if len(buffer) == window_size and rejected_index != -1:
+                    buffer[rejected_index] = message_data
+                    rejected_index = -1
                 else:
+                    buffer.append(message_data)
+                if len(buffer) == window_size and rejected_index == -1:
+                    if window_index == 4:
+                        time.sleep(1)
                     windows_received.add(window_index)
                     transfer_from_buffer_to_memory(connection, window_index, buffer, result)
-        elif message_type == DISCONNECT_MESSAGE:
-            if len(buffer) != 0:
-                if rejected:
-                    rejected = False
-                    buffer.clear()
-                    connection.send(f'{RESPONSE_REJECTED}{window_index}'.encode(FORMAT))
-                else:
+            elif message_type == DISCONNECT_MESSAGE:
+                if rejected_index != -1:
+                    buffer[rejected_index] = message_data
+                    rejected_index = -1
+                if len(buffer) != 0:
                     windows_received.add(window_index)
                     transfer_from_buffer_to_memory(connection, window_index, buffer, result)
+                connected = False
+                connection.close()
+                print(f'Disconnected from {address}')
+                break
+            else:
+                print(f'Unknown message type: {message_type}')
+                rejected_index = len(buffer)
+                connection.send(f'{RESPONSE_REJECTED}{rejected_index}'.encode(FORMAT))
+                buffer.append(message_data)
+                if len(buffer) == window_size:
+                    buffer.clear()
+        else:
+            print(f'Unknown protocol: {protocol}')
             connected = False
             connection.close()
-            print(f'Disconnected from {address}')
-            break
-        else:
-            print(f'Unknown message type: {message_type}')
-            rejected = True
-            buffer.append(message_data)
-            if len(buffer) == window_size:
-                buffer.clear()
 
 
 def transfer_from_buffer_to_memory(connection, window_index, buffer, memory):
@@ -81,7 +121,8 @@ def start(host):
     print('Server started')
     while True:
         connection, address = host.accept()
-        thread = threading.Thread(target=handle_client_go_back_n, args=(connection, address))
+        protocol = connection.recv(64).decode(FORMAT)
+        thread = threading.Thread(target=handle_client, args=(connection, address, protocol))
         thread.start()
 
 
