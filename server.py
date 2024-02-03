@@ -10,7 +10,7 @@ FRAME_MESSAGE = 'F'
 DISCONNECT_MESSAGE = 'D'
 RESPONSE_READY_TO_RECEIVE = 'RR'
 RESPONSE_REJECTED = 'REJ'
-GO_BACK_N = 'GO_BACK_N'
+GO_BACK_N = 'GO_BACK_N_______'
 SELECTIVE_REJECT = 'SELECTIVE_REJECT'
 
 
@@ -121,7 +121,7 @@ def start(host):
     print('Server started')
     while True:
         connection, address = host.accept()
-        protocol = connection.recv(64).decode(FORMAT)
+        protocol = connection.recv(len(GO_BACK_N)).decode(FORMAT)
         thread = threading.Thread(target=handle_client, args=(connection, address, protocol))
         thread.start()
 
