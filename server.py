@@ -44,6 +44,8 @@ def handle_client(connection, address, protocol, server_messages_textbox):
         window_index = int(message[1])
         message_data = message[2]
 
+        set_text(server_messages_textbox, f'[Received Frame] {message_type}-{window_index}-{message_data}')
+
         if protocol == GO_BACK_N:
             if window_index in windows_received:
                 continue
