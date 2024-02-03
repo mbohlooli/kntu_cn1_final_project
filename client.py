@@ -212,13 +212,13 @@ if __name__ == '__main__':
     root.title("Protocol Simulator Client")
     root.configure(bg=BACKGROUND)
 
-    message_input = init_message_input(root, message_var)
+    message_field = init_message_input(root, message_var)
     sender_messages = init_messages_textbox(root)
     window_size = init_window_size_input(root, window_size_var)
     go_back_n, selective_reject = init_protocol_buttons(root, protocol_var)
     timeout_field = init_timeout_input(root, timeout_var)
     init_start_button(root, sender_messages, window_size_var, timeout_var, protocol_var, message_var, client, go_back_n,
-                      selective_reject, window_size, timeout_field, message_input)
+                      selective_reject, window_size, timeout_field, message_field)
 
     root.mainloop()
     client.close()
