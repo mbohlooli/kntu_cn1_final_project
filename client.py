@@ -8,7 +8,7 @@ from server import ADDRESS, FORMAT, FRAME_MESSAGE, DISCONNECT_MESSAGE, RESPONSE_
 from gui_config import *
 
 
-def start_client(connection, sender_messages_text, window_size_ref, timeout_ref, protocol_ref):
+def start_client(connection, sender_messages_text, window_size_ref, timeout_ref, protocol_ref, message_ref):
     selected_protocol = GO_BACK_N if protocol_ref.get() == 1 else SELECTIVE_REJECT
 
     connection.connect(ADDRESS)
@@ -19,7 +19,7 @@ def start_client(connection, sender_messages_text, window_size_ref, timeout_ref,
         args=(
             connection,
             window_size_ref.get(),
-            'hello this is the first message that i am sending.',
+            message_ref.get(),
             sender_messages_text,
             timeout_ref.get(),
             selected_protocol
@@ -122,6 +122,15 @@ def set_text(textbox, text):
     textbox.config(state='disabled')
 
 
+def init_message_input(root_window, message_ref):
+    (tk.Label(root_window, text="Enter the message to send:", font=LABEL_FONT, bg=BACKGROUND)
+     .grid(row=0, column=0, pady=10, padx=10, sticky='e'))
+    message_entry = tk.Entry(root_window, textvariable=message_ref, width=50, justify='center', font=TEXT_FONT)
+    message_entry.grid(row=0, column=1, pady=10, padx=10)
+    message_entry.config({"background": '#FCCA6E'})
+    return message_entry
+
+
 def init_messages_textbox(root_window):
     tk.Label(
         root_window, text="Sender Messages:", font=LABEL_FONT, bg=BACKGROUND
@@ -134,9 +143,9 @@ def init_messages_textbox(root_window):
 
 def init_window_size_input(root_window, window_size_ref):
     (tk.Label(root_window, text="Enter the window size:", font=LABEL_FONT, bg=BACKGROUND)
-     .grid(row=0, column=0, pady=10, padx=10, sticky='e'))
+     .grid(row=1, column=0, pady=10, padx=10, sticky='e'))
     window_size_entry = tk.Entry(root_window, textvariable=window_size_ref, width=50, justify='center', font=TEXT_FONT)
-    window_size_entry.grid(row=0, column=1, pady=10, padx=10)
+    window_size_entry.grid(row=1, column=1, pady=10, padx=10)
     window_size_entry.config({"background": '#FCCA6E'})
     window_size_entry.delete(0, tk.END)
     window_size_entry.insert(0, '6')
@@ -160,27 +169,29 @@ def init_protocol_buttons(root_window, protocol_ref):
 
 def init_timeout_input(root_window, timeout_ref):
     (tk.Label(root_window, text="Enter the timeout in seconds:", font=LABEL_FONT, bg=BACKGROUND)
-     .grid(row=1, column=0, pady=10, padx=10, sticky='e'))
+     .grid(row=2, column=0, pady=10, padx=10, sticky='e'))
     timeout_entry = tk.Entry(root_window, textvariable=timeout_ref, width=50, justify='center', font=TEXT_FONT)
-    timeout_entry.grid(row=1, column=1, pady=10, padx=10)
+    timeout_entry.grid(row=2, column=1, pady=10, padx=10)
     timeout_entry.config({"background": '#FCCA6E'})
     timeout_entry.delete(0, tk.END)
     timeout_entry.insert(0, '0.5')
     return timeout_entry
 
 
-def init_start_button(root_window, sender_messages_text, window_size_ref, timeout_ref, protocol_ref, connection,
-                      go_back_n_radio, selective_reject_radio, window_size_input, timeout_input):
+def init_start_button(root_window, sender_messages_text, window_size_ref, timeout_ref, protocol_ref, message_ref,
+                      connection, go_back_n_radio, selective_reject_radio, window_size_input, timeout_input,
+                      message_input):
     start_sender_button = tk.Button(
         root_window,
         text="Start Sending",
         command=lambda: [
-            start_client(connection, sender_messages_text, window_size_ref, timeout_ref, protocol_ref),
+            start_client(connection, sender_messages_text, window_size_ref, timeout_ref, protocol_ref, message_ref),
             start_sender_button.configure(state=tk.DISABLED),
             go_back_n_radio.configure(state=tk.DISABLED),
             selective_reject_radio.configure(state=tk.DISABLED),
             window_size_input.configure(state=tk.DISABLED),
-            timeout_input.configure(state=tk.DISABLED)
+            timeout_input.configure(state=tk.DISABLED),
+            message_input.config(state=tk.DISABLED)
         ],
         bg=BACKGROUND,
         font=LABEL_FONT
@@ -201,12 +212,13 @@ if __name__ == '__main__':
     root.title("Protocol Simulator Client")
     root.configure(bg=BACKGROUND)
 
+    message_input = init_message_input(root, message_var)
     sender_messages = init_messages_textbox(root)
     window_size = init_window_size_input(root, window_size_var)
     go_back_n, selective_reject = init_protocol_buttons(root, protocol_var)
     timeout_field = init_timeout_input(root, timeout_var)
-    init_start_button(root, sender_messages, window_size_var, timeout_var, protocol_var, client, go_back_n,
-                      selective_reject, window_size, timeout_field)
+    init_start_button(root, sender_messages, window_size_var, timeout_var, protocol_var, message_var, client, go_back_n,
+                      selective_reject, window_size, timeout_field, message_input)
 
     root.mainloop()
     client.close()
