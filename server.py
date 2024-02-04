@@ -20,7 +20,10 @@ SELECTIVE_REJECT = 'SELECTIVE_REJECT'
 
 def start_server(connection, server_messages_textbox):
     connection.bind(ADDRESS)
-    start(connection, server_messages_textbox)
+    try:
+        start(connection, server_messages_textbox)
+    except OSError:
+        pass
 
 
 def handle_client(connection, address, protocol, server_messages_textbox):
@@ -125,7 +128,7 @@ def handle_client(connection, address, protocol, server_messages_textbox):
 def transfer_from_buffer_to_memory(connection, window_index, buffer, memory, server_messages_textbox):
     memory.extend(buffer)
     buffer.clear()
-    set_text(server_messages_textbox, f'Received {"".join(memory)}')
+    set_text(server_messages_textbox, f'[Received] "{"".join(memory)}"')
     connection.send(f'{RESPONSE_READY_TO_RECEIVE}{window_index}'.encode(FORMAT))
 
 
@@ -165,8 +168,11 @@ if __name__ == '__main__':
 
     server_messages = init_messages_textbox(root)
 
-    thread = threading.Thread(target=start_server, args=(server, server_messages))
-    thread.start()
-    # start_server(server, server_messages)
+    start_server_thread = threading.Thread(target=start_server, args=(server, server_messages))
+    start_server_thread.start()
 
     root.mainloop()
+    try:
+        server.close()
+    finally:
+        pass
